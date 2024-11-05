@@ -26,3 +26,11 @@
     height: 100px;
     margin: 0 auto;
 }
+
+/* Style the individual cards as needed */
+.review-card {
+    max-height: 350px; /* Adjust the maximum height as needed */
+    overflow-y: auto;
+    width: 45%; /* Adjust the width as per your design, leaving a little space for margins */
+    margin: 2%; /* Add margin between cards */
+}
