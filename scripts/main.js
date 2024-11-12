@@ -1,27 +1,38 @@
-function getNameFromAuth() {
+//Global variable pointing to the current user's Firestore document
+var currentUserRef;
+
+//Function that calls everything needed for the main page
+function doAll() {
     firebase.auth().onAuthStateChanged((user) => {
-        // Check if a user is signed in:
         if (user) {
-            // Do something for the currently logged-in user here:
-            console.log(user.uid); //print the uid in the browser console
-            console.log(user.displayName); //print the user name in the browser console
-            userName = user.displayName;
+            currentUserRef = db.collection("users").doc(user.uid); //global
+            console.log(currentUserRef);
 
-            //method #1:  insert with JS
-            //document.getElementById("name-goes-here").innerText = userName;
+            // figure out what day of the week it is today
+            const weekday = [
+                "sunday",
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+            ];
+            const d = new Date();
+            let day = weekday[d.getDay()];
 
-            //method #2:  insert using jquery
-            //$("#name-goes-here").text(userName); //using jquery
-
-            //method #3:  insert using querySelector
-            document.querySelector("#name-goes-here").innerText = userName;
+            // the following functions are always called when someone is logged in
+            readQuote(day);
+            insertNameFromFirestore(user);
+            displayCardsDynamically("hikes");
         } else {
             // No user is signed in.
-            console.log("No user is logged in");
+            console.log("No user is signed in");
+            window.location.href = "login.html";
         }
     });
 }
-getNameFromAuth(); //run the function
+doAll();
 
 // Function to read the quote of the day from the Firestore "quotes" collection
 // Input param is the String representing the day of the week, aka, the document name
@@ -44,7 +55,63 @@ function readQuote(day) {
             }
         );
 }
-readQuote("tuesday"); //calling the function
+// readQuote("tuesday"); //calling the function
+
+//-----------------------------------------------------------------------------
+// This function is called whenever the user clicks on the "bookmark" icon.
+// It adds the hike to the "bookmarks" array
+// Then it will change the bookmark icon from the hollow to the solid version.
+//-----------------------------------------------------------------------------
+function saveBookmark(hikeDocID) {
+    currentUserRef.get().then((userDoc) => {
+        //get the user name
+        var bookmarks = userDoc.data().bookmarks;
+        if (bookmarks.includes(hikeDocID)) {
+            currentUserRef
+                .update({
+                    // Use 'arrayUnion' to add the new bookmark ID to the 'bookmarks' array.
+                    // This method ensures that the ID is added only if it's not already present, preventing duplicates.
+                    bookmarks:
+                        firebase.firestore.FieldValue.arrayRemove(hikeDocID),
+                })
+                // Handle the front-end update to change the icon, providing visual feedback to the user that it has been clicked.
+                .then(function () {
+                    console.log("bookmark has been removed for" + hikeDocID);
+                    let iconID = "save-" + hikeDocID;
+                    //this is to change the icon of the hike that was saved to "filled"
+                    // console.log("in saveBookmark", document.getElementById(iconID));
+                    document.getElementById(iconID).innerText =
+                        "bookmark_border";
+                })
+                .catch((error) => {
+                    console.error("Error removing bookmark", error);
+                    alert("Error removing bookmark. Please try again later.");
+                });
+        } else {
+            currentUserRef
+                .update({
+                    // Use 'arrayUnion' to add the new bookmark ID to the 'bookmarks' array.
+                    // This method ensures that the ID is added only if it's not already present, preventing duplicates.
+                    bookmarks:
+                        firebase.firestore.FieldValue.arrayUnion(hikeDocID),
+                })
+                // Handle the front-end update to change the icon, providing visual feedback to the user that it has been clicked.
+                .then(function () {
+                    console.log("bookmark has been saved for" + hikeDocID);
+                    let iconID = "save-" + hikeDocID;
+                    console.log(iconID);
+                    //this is to change the icon of the hike that was saved to "filled"
+                    // console.log("in saveBookmark", document.getElementById(iconID));
+                    document.getElementById(iconID).innerText = "bookmark";
+                })
+                .catch((error) => {
+                    console.error("Error saving bookmark", error);
+                    alert("Error saving bookmark. Please try again later.");
+                });
+        }
+    });
+    // Manage the backend process to store the hikeDocID in the database, recording which hike was bookmarked by the user.
+}
 
 //------------------------------------------------------------------------------
 // Input parameter is a string representing the collection we are reading from
@@ -53,6 +120,7 @@ function displayCardsDynamically(collection) {
     let cardTemplate = document.getElementById("hikeCardTemplate"); // Retrieve the HTML element with the ID "hikeCardTemplate" and store it in the cardTemplate variable.
 
     db.collection(collection)
+        .orderBy("length")
         .get() //the collection called "hikes"
         .then((allHikes) => {
             var i = 1; //Optional: if you want to have a unique ID for each hike
@@ -87,6 +155,32 @@ function displayCardsDynamically(collection) {
                     .querySelector(".card-image")
                     .setAttribute("id", "cimage" + i);
 
+                newcard.querySelector(".card-length").innerHTML =
+                    "Length: " +
+                    doc.data().length +
+                    " km <br>" +
+                    "Duration: " +
+                    doc.data().hike_time +
+                    "min <br>" +
+                    "Last updated: " +
+                    doc.data().last_updated.toDate().toLocaleDateString();
+
+                const bookmarkIcon = newcard.querySelector("i");
+                bookmarkIcon.id = "save-" + docID;
+
+                bookmarkIcon.addEventListener("click", () =>
+                    saveBookmark(docID)
+                );
+
+                currentUserRef.get().then((userDoc) => {
+                    //get the user name
+                    var bookmarks = userDoc.data().bookmarks;
+                    if (bookmarks.includes(docID)) {
+                        document.getElementById("save-" + docID).innerText =
+                            "bookmark";
+                    }
+                });
+
                 //attach to gallery, Example: "hikes-go-here"
                 document
                     .getElementById(collection + "-go-here")
@@ -97,7 +191,7 @@ function displayCardsDynamically(collection) {
         });
 }
 
-displayCardsDynamically("hikes"); //input param is the name of the collection
+// displayCardsDynamically("hikes"); //input param is the name of the collection
 
 // function writeHikes() {
 //     //define a variable for the collection you want to create in Firestore to populate data

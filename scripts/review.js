@@ -29,6 +29,7 @@ stars.forEach((star, index) => {
     });
 });
 
+console.log("firebase", firebase.auth().currentUser);
 function writeReview() {
     console.log("inside write review");
     let hikeTitle = document.getElementById("title").value;
@@ -67,6 +68,7 @@ function writeReview() {
     );
 
     var user = firebase.auth().currentUser;
+    console.log("firebase", user);
     if (user) {
         var currentUser = db.collection("users").doc(user.uid);
         var userID = user.uid;
